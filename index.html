@@ -2,60 +2,98 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>SpiritScope - Energy Mirror</title>
+  <title>SpiritScope - Energy Detection Portal</title>
   <style>
-    body {
+    html, body {
       margin: 0;
-      background: black;
       overflow: hidden;
+      background: black;
     }
     video, canvas {
       position: absolute;
       top: 0;
       left: 0;
+      object-fit: cover;
       width: 100vw;
       height: 100vh;
-      object-fit: cover;
     }
-    canvas {
-      pointer-events: none;
+    #energyDisplay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: monospace;
+      background: rgba(0,0,0,0.5);
+      padding: 8px 14px;
+      border-radius: 10px;
     }
   </style>
 </head>
 <body>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="auraCanvas"></canvas>
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="canvas"></canvas>
+  <div id="energyDisplay">Reading energy...</div>
 
   <script>
     const video = document.getElementById('video');
-    const canvas = document.getElementById('auraCanvas');
+    const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const energyDisplay = document.getElementById('energyDisplay');
 
-    // Get camera stream
+    // Setup camera
     navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => video.srcObject = stream)
-      .catch(err => console.error("Camera error:", err));
+      .then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          video.play();
+          startEnergyScanner();
+        };
+      })
+      .catch(err => alert("Camera Access Denied"));
 
-    // Resize canvas
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+    function startEnergyScanner() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      function draw() {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = frame.data;
+
+        let r = 0, g = 0, b = 0, total = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          r += pixels[i];
+          g += pixels[i + 1];
+          b += pixels[i + 2];
+          total++;
+        }
+        r = Math.floor(r / total);
+        g = Math.floor(g / total);
+        b = Math.floor(b / total);
+        const brightness = Math.floor((r + g + b) / 3);
+
+        // Clear canvas and draw aura
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, brightness * 1.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Text feedback
+        energyDisplay.innerHTML = `
+          <b>Energy Scan</b><br>
+          RGB: ${r}, ${g}, ${b}<br>
+          Brightness: ${brightness}<br>
+          Aura Field Radius: ${brightness * 1.5}
+        `;
+
+        requestAnimationFrame(draw);
+      }
+
+      draw();
     }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    // Aura visual pulse based on average light
-    function drawAuraEffect() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.globalAlpha = 0.06;
-      ctx.fillStyle = 'rgba(100, 255, 200, 0.4)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      requestAnimationFrame(drawAuraEffect);
-    }
-
-    drawAuraEffect();
   </script>
 </body>
 </html>
